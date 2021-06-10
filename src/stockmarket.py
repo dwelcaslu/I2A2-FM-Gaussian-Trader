@@ -6,11 +6,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+plt.rcParams.update({'font.size': 12})
+
+
 class MarkerOperator:
     def __init__(self, estimator, features_names: list, initial_cash: float = 1000, initial_stocks: int = 0,
                  open_col: str = 'Abertura', close_col: str = 'Fech.', min_col: str = 'Mínimo',
                  max_col: str = 'Máximo', price_ref_col: str = 'Fech.',
-                 daily_negotiable_perc: float = 0.2, min_stocks_op: int = 1, broker_taxes: float = 0) -> None:
+                 daily_negotiable_perc: float = 0.5, min_stocks_op: int = 1, broker_taxes: float = 0) -> None:
         # Input parameters:
         self.estimator = estimator
         self.initial_cash = initial_cash
@@ -31,12 +34,12 @@ class MarkerOperator:
     def run(self, df_data: pd.DataFrame) -> pd.DataFrame:
         """
         operation actions:
-            0 - do nothing
+            0 - hold position
             1 - buy stocks
             2 - sell stocks
         """
         y_pred = self.estimator.predict(df_data[self.features_names])
-        df_tmp = df_data[self.features_names]
+        df_tmp = df_data.copy()
         df_tmp['op'] = y_pred
         df_tmp['cash'] = float(self.initial_cash)
         df_tmp['n_stocks'] = int(self.initial_stocks)
@@ -93,7 +96,7 @@ class MarkerOperator:
         cash_updated = cash_value + (n_stocks_sold * stock_price) - self.broker_taxes
         return cash_updated, n_stocks_sold
 
-    def plot_wealth(self, figsize=(12, 8)):
+    def plot_wealth(self, figsize=(12, 6)):
         init_w = round(self.op_results['wealth'].values[0], 2)
         final_w = round(self.op_results['wealth'].values[-1], 2)
         variation_perc_ = round(100*(self.op_results['wealth'].values[-1] - self.op_results['wealth'].values[0]) / self.op_results['wealth'].values[0], 2)
@@ -104,25 +107,34 @@ class MarkerOperator:
         self.op_results['cash'].plot(label='cash', zorder=2)
         plt.xlim([self.op_results.index.min(), self.op_results.index.max()])
         plt.ylabel('$')
+        plt.legend(loc='best', prop={'size': 10}, ncol=2)
         plt.grid()
-        plt.legend(loc='best')
         plt.tight_layout()
         plt.show()
 
-    def plot_operations(self, figsize=(12, 8)):
+    def plot_operations(self, figsize=(12, 10)):
         plt.figure(figsize=figsize)
-        plt.subplot(2, 1, 1)
+        plt.subplot(3, 1, 1)
         self.op_results[self.price_ref_col].plot(label=self.price_ref_col, zorder=2)
+        plt.scatter(self.op_results[self.op_results['op'] == 0].index, self.op_results[self.op_results['op'] == 0][self.price_ref_col], label='hold', alpha=0.5, zorder=3)
+        plt.scatter(self.op_results[self.op_results['op'] == 1].index, self.op_results[self.op_results['op'] == 1][self.price_ref_col], label='buy', alpha=0.5, zorder=3)
+        plt.scatter(self.op_results[self.op_results['op'] == 2].index, self.op_results[self.op_results['op'] == 2][self.price_ref_col], label='sell', alpha=0.5, zorder=3)
         plt.xlim([self.op_results.index.min(), self.op_results.index.max()])
-        plt.ylabel('$')
+        plt.ylabel('stock price [$]')
+        plt.legend(loc='best', prop={'size': 10}, ncol=2)
         plt.grid()
-        plt.subplot(2, 1, 2)
-        plt.scatter(self.op_results[self.op_results['op'] == 0].index, self.op_results[self.op_results['op'] == 0]['op'], alpha=0.5, zorder=2)
-        plt.scatter(self.op_results[self.op_results['op'] == 1].index, self.op_results[self.op_results['op'] == 1]['op'], alpha=0.5, zorder=2)
-        plt.scatter(self.op_results[self.op_results['op'] == 2].index, self.op_results[self.op_results['op'] == 2]['op'], alpha=0.5, zorder=2)
+        plt.subplot(3, 1, 2)
+        self.op_results['macd'].plot(label='macd', zorder=2)
+        self.op_results['signal'].plot(label='signal', zorder=2)
+        plt.bar(self.op_results.index, self.op_results['histogram'], label='Histogram', zorder=2)
         plt.xlim([self.op_results.index.min(), self.op_results.index.max()])
-        plt.ylabel('model operations')
-        plt.yticks([0, 1, 2], ['wait', 'buy', 'sell'])
+        plt.ylabel('Trend indicators')
+        plt.legend(loc='best', prop={'size': 10}, ncol=2)
+        plt.grid()
+        plt.subplot(3, 1, 3)
+        self.op_results['williams_r'].plot(label='williams_r', zorder=2)
+        plt.xlim([self.op_results.index.min(), self.op_results.index.max()])
+        plt.ylabel('Williams %R')
         plt.grid()
         plt.tight_layout()
         plt.show()
