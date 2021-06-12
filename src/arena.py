@@ -16,10 +16,12 @@ plt.rcParams.update({'font.size': 12})
 
 
 class TraderArena:
-    def __init__(self, target_names: list, n_gens: int = 10, init_population: int = 100, n_mutations: int = 10,
+    def __init__(self, target_names: list, target_prop: list = None,
+                 n_gens: int = 10, init_population: int = 100, n_mutations: int = 10,
                  mut_perc: float = 0.1, patience: int = 100, train_size: float = 0.6) -> None:
         # Input parameters:
         self.target_names = target_names
+        self.target_prop = target_prop if target_prop is not None else np.array([1/len(target_names) for _ in target_names])
         self.n_gens = n_gens
         self.init_population = init_population
         self.n_mutations = n_mutations
@@ -93,24 +95,32 @@ class TraderArena:
         return self.est_opt
     
     def populate_templates(self, templates_len):
-        templates = [np.random.choice([0, 1, 2], templates_len, replace=True) for _ in range(self.init_population)]
-        return templates       
+        templates = [np.random.choice(self.target_names, templates_len, p=self.target_prop, replace=True) for _ in range(self.init_population)]
+        return templates
 
     def mutate_templates(self, templates, wealth_train_valid):
+        idx_grad_neg = np.where(np.gradient(wealth_train_valid) <= 0)[0]
+        if idx_grad_neg.shape[0] == wealth_train_valid.shape[0]:
+            idx_grad_neg = np.array([])
         mutated_templates = []
         for temp in templates:
             n_mutations = int(self.mut_perc * len(temp))
             mutated_templates.append(copy.deepcopy(temp))
-            for _ in range(self.n_mutations):
+            for _ in range(int(self.n_mutations/2)):
                 try:
-                    mut_idxs = np.random.choice(np.where(np.gradient(wealth_train_valid) <= 0)[0], n_mutations, replace=False)
+                    mut_idxs = np.random.choice(idx_grad_neg, n_mutations, replace=False if idx_grad_neg.shape[0] > n_mutations else True)
                 except ValueError:
                     mut_idxs = np.random.choice([i for i in range(len(temp))], n_mutations, replace=False)
-                mut_values = np.random.choice(self.target_names, n_mutations, replace=True)
+                mut_values = np.random.choice(self.target_names, n_mutations, p=self.target_prop, replace=True)
+                mutated_templates.append(copy.deepcopy(temp))
+                mutated_templates[-1][mut_idxs] = mut_values
+            for _ in range(int(self.n_mutations/2)):
+                mut_idxs = np.random.choice([i for i in range(len(temp))], n_mutations, replace=False)
+                mut_values = np.random.choice(self.target_names, n_mutations, p=self.target_prop, replace=True)
                 mutated_templates.append(copy.deepcopy(temp))
                 mutated_templates[-1][mut_idxs] = mut_values
         return mutated_templates
-    
+
     def plot_evolution(self, figsize=(12, 8), normalize=True):
         div = self.initial_cash if normalize else 1
         plt.figure(figsize=figsize)

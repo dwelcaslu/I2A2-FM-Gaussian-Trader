@@ -43,7 +43,12 @@ class MarkerOperator:
         df_tmp['op'] = y_pred
         df_tmp['cash'] = float(self.initial_cash)
         df_tmp['n_stocks'] = int(self.initial_stocks)
-        df_tmp['wealth'] = df_tmp['cash'] + df_tmp['n_stocks'] * df_tmp[self.close_col]
+        df_tmp['wealth'] = df_tmp['cash'] + df_tmp['n_stocks'] * df_tmp[self.price_ref_col]
+        # Determining the performance of a baseline model performance:
+        wealth_init = df_tmp['wealth'].values[0]
+        n_stocks_init = int(wealth_init/df_tmp[self.price_ref_col].values[0])
+        df_tmp['baseline_wealth'] = (wealth_init - n_stocks_init*df_tmp[self.price_ref_col].values[0]) + n_stocks_init * df_tmp[self.price_ref_col]
+
         # Appending a new row:
         new_row = pd.DataFrame([{col:np.nan for col in df_tmp.columns}])
         new_row.index = [df_tmp.index[-1] + timedelta(days=1)]
@@ -96,15 +101,17 @@ class MarkerOperator:
         cash_updated = cash_value + (n_stocks_sold * stock_price) - self.broker_taxes
         return cash_updated, n_stocks_sold
 
-    def plot_wealth(self, figsize=(12, 6)):
+    def plot_wealth(self, figsize=(12, 8), grad_threshold=10):
         init_w = round(self.op_results['wealth'].values[0], 2)
         final_w = round(self.op_results['wealth'].values[-1], 2)
         variation_perc_ = round(100*(self.op_results['wealth'].values[-1] - self.op_results['wealth'].values[0]) / self.op_results['wealth'].values[0], 2)
+        variation_base_perc_ = round(100*(self.op_results['baseline_wealth'].values[-2] - self.op_results['baseline_wealth'].values[0]) / self.op_results['baseline_wealth'].values[0], 2)
         plt.figure(figsize=figsize)
-        plt.title(f"Initial wealth: {init_w}; Final wealth: {final_w}; Variation: {variation_perc_}%")
+        plt.title(f"Initial wealth: {init_w}; Final wealth: {final_w}\nModel gain: {variation_perc_}% Base gain: {variation_base_perc_}%")
         self.op_results['wealth'].plot(label='wealth', zorder=2)
         plt.plot(self.op_results['n_stocks'] * self.op_results[self.close_col], label='stock value', zorder=2)
         self.op_results['cash'].plot(label='cash', zorder=2)
+        self.op_results['baseline_wealth'].plot(label='baseline', color='k', alpha=0.5, zorder=2)
         plt.xlim([self.op_results.index.min(), self.op_results.index.max()])
         plt.ylabel('$')
         plt.legend(loc='best', prop={'size': 10}, ncol=2)
