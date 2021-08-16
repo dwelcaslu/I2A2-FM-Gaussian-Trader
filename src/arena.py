@@ -18,7 +18,7 @@ plt.rcParams.update({'font.size': 12})
 class TraderArena:
     def __init__(self, target_names: list, target_prop: list = None,
                  n_gens: int = 10, init_population: int = 100, n_mutations: int = 10,
-                 mut_perc: float = 0.1, patience: int = 100, train_size: float = 0.6) -> None:
+                 mut_perc: float = None, patience: int = 100, train_size: float = 0.6) -> None:
         # Input parameters:
         self.target_names = target_names
         self.target_prop = target_prop if target_prop is not None else np.array([1/len(target_names) for _ in target_names])
@@ -104,19 +104,20 @@ class TraderArena:
             idx_grad_neg = np.array([])
         mutated_templates = []
         for temp in templates:
-            n_mutations = int(self.mut_perc * len(temp))
             mutated_templates.append(copy.deepcopy(temp))
             for _ in range(int(self.n_mutations/2)):
+                n_modifs = int(np.random.rand() * len(temp)) if self.mut_perc is None else int(self.mut_perc * len(temp))
                 try:
-                    mut_idxs = np.random.choice(idx_grad_neg, n_mutations, replace=False if idx_grad_neg.shape[0] > n_mutations else True)
+                    mut_idxs = np.random.choice(idx_grad_neg, n_modifs, replace=False if idx_grad_neg.shape[0] > n_modifs else True)
                 except ValueError:
-                    mut_idxs = np.random.choice([i for i in range(len(temp))], n_mutations, replace=False)
-                mut_values = np.random.choice(self.target_names, n_mutations, p=self.target_prop, replace=True)
+                    mut_idxs = np.random.choice([i for i in range(len(temp))], n_modifs, replace=False)
+                mut_values = np.random.choice(self.target_names, n_modifs, p=self.target_prop, replace=True)
                 mutated_templates.append(copy.deepcopy(temp))
                 mutated_templates[-1][mut_idxs] = mut_values
             for _ in range(int(self.n_mutations/2)):
-                mut_idxs = np.random.choice([i for i in range(len(temp))], n_mutations, replace=False)
-                mut_values = np.random.choice(self.target_names, n_mutations, p=self.target_prop, replace=True)
+                n_modifs = int(np.random.rand() * len(temp)) if self.mut_perc is None else int(self.mut_perc * len(temp))
+                mut_idxs = np.random.choice([i for i in range(len(temp))], n_modifs, replace=False)
+                mut_values = np.random.choice(self.target_names, n_modifs, p=self.target_prop, replace=True)
                 mutated_templates.append(copy.deepcopy(temp))
                 mutated_templates[-1][mut_idxs] = mut_values
         return mutated_templates
